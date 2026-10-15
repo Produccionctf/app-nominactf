@@ -13,7 +13,6 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen pb-12">
 
-  <!-- ENCABEZADO Y CONTROL DE SEMANA -->
   <header class="bg-indigo-900 text-white shadow-lg sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
       <div class="flex items-center gap-3">
@@ -26,7 +25,6 @@
         </div>
       </div>
 
-      <!-- Selector de Semana -->
       <div class="flex items-center bg-indigo-950/60 p-1.5 rounded-xl border border-indigo-700/50">
         <button id="btnPrevWeek" class="p-2 hover:bg-indigo-800 rounded-lg transition text-indigo-200 hover:text-white">
           <i class="fa-solid fa-chevron-left"></i>
@@ -40,7 +38,6 @@
         </button>
       </div>
 
-      <!-- Exportar -->
       <div class="flex items-center gap-2">
         <button id="btnExportCSV" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2">
           <i class="fa-solid fa-file-excel text-sm"></i> Exportar a Excel
@@ -51,7 +48,6 @@
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
 
-    <!-- PANEL DE RESUMEN GENERAL -->
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
         <div>
@@ -98,7 +94,6 @@
       </div>
     </section>
 
-    <!-- BARRA DE ACCIONES Y ASIGNACIÓN MASIVA -->
     <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col lg:flex-row items-center justify-between gap-4">
       <form id="formAddEmployee" class="flex items-center gap-2 w-full lg:w-auto">
         <input type="text" id="inputEmpName" placeholder="Nombre del empleado..." class="w-full lg:w-64 px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -118,12 +113,10 @@
       </div>
     </section>
 
-    <!-- LISTADO DE EMPLEADOS DESPLEGABLE -->
     <section class="space-y-3" id="employeesContainer"></section>
 
   </main>
 
-  <!-- MODAL CONFIGURACIÓN SALARIAL -->
   <div id="salaryModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
       <h3 class="text-lg font-bold text-slate-900 mb-1" id="modalEmpTitle">Esquema Salarial Diferencial</h3>
@@ -168,14 +161,11 @@
     let editingEmpId = null;
 
     let appData = JSON.parse(localStorage.getItem('nomina_app_data')) || {
-      employees: [
-        { id: '1', name: 'Juan Pérez', payType: 'estandar', fixedSalary: 0, customHour: 0, customExtra: 0 },
-        { id: '2', name: 'María Rodríguez', payType: 'fijo_semanal', fixedSalary: 450000, customHour: 0, customExtra: 0 }
-      ],
+      employees: [],
       records: {}
     };
 
-    function getWeekInfo(offset = 0) {
+    function getWeekInfo(offset) {
       const now = new Date();
       const dayOfWeek = now.getDay();
       const sunday = new Date(now);
@@ -186,12 +176,12 @@
 
       const weekNum = getISOWeekNumber(sunday);
       const year = sunday.getFullYear();
-      const weekKey = `${year}-W${weekNum}`;
+      const weekKey = year + '-W' + weekNum;
 
       const formatOpts = { month: 'short', day: 'numeric' };
-      const rangeText = `${sunday.toLocaleDateString('es-ES', formatOpts)} - ${saturday.toLocaleDateString('es-ES', formatOpts)}`;
+      const rangeText = sunday.toLocaleDateString('es-ES', formatOpts) + ' - ' + saturday.toLocaleDateString('es-ES', formatOpts);
 
-      return { weekKey, weekNum, year, rangeText, sunday };
+      return { weekKey: weekKey, weekNum: weekNum, year: year, rangeText: rangeText, sunday: sunday };
     }
 
     function getISOWeekNumber(d) {
@@ -209,23 +199,23 @@
     function calculateDailyPay(emp, dayIndex, inTime, outTime, isFestive) {
       if (!inTime || !outTime) return { hours: 0, regularHours: 0, extraHours: 0, pay: 0 };
 
-      const [hIn, mIn] = inTime.split(':').map(Number);
-      const [hOut, mOut] = outTime.split(':').map(Number);
+      const partsIn = inTime.split(':').map(Number);
+      const partsOut = outTime.split(':').map(Number);
       
-      let totalMins = (hOut * 60 + mOut) - (hIn * 60 + mIn);
+      let totalMins = (partsOut[0] * 60 + partsOut[1]) - (partsIn[0] * 60 + partsIn[1]);
       if (totalMins < 0) totalMins += 24 * 60;
       
       const hours = Math.max(0, totalMins / 60);
 
       if (emp.payType === 'fijo_semanal') {
-        return { hours, regularHours: Math.min(7, hours), extraHours: Math.max(0, hours - 7), pay: emp.fixedSalary / 6 };
+        return { hours: hours, regularHours: Math.min(7, hours), extraHours: Math.max(0, hours - 7), pay: emp.fixedSalary / 6 };
       }
 
       if (emp.payType === 'hora_personalizada') {
         const regH = Math.min(7, hours);
         const extH = Math.max(0, hours - 7);
         const pay = (regH * emp.customHour) + (extH * emp.customExtra) + (isFestive ? 20000 : 0);
-        return { hours, regularHours: regH, extraHours: extH, pay };
+        return { hours: hours, regularHours: regH, extraHours: extH, pay: pay };
       }
 
       const isSunday = (dayIndex === 0);
@@ -241,12 +231,12 @@
 
       if (isFestive) pay += 20000;
 
-      return { hours, regularHours: regH, extraHours: extH, pay };
+      return { hours: hours, regularHours: regH, extraHours: extH, pay: pay };
     }
 
     function renderApp() {
       const weekInfo = getWeekInfo(currentWeekOffset);
-      document.getElementById('labelWeekNum').textContent = `Semana ${weekInfo.weekNum} - ${weekInfo.year}`;
+      document.getElementById('labelWeekNum').textContent = 'Semana ' + weekInfo.weekNum + ' - ' + weekInfo.year;
       document.getElementById('labelWeekRange').textContent = weekInfo.rangeText;
 
       const container = document.getElementById('employeesContainer');
@@ -261,16 +251,24 @@
         appData.records[weekInfo.weekKey] = {};
       }
 
-      appData.employees.forEach(emp => {
+      appData.employees.forEach(function(emp) {
         if (!appData.records[weekInfo.weekKey][emp.id]) {
-          appData.records[weekInfo.weekKey][emp.id] = Array(7).fill(null).map(() => ({ in: '', out: '', isFestive: false, note: '' }));
+          appData.records[weekInfo.weekKey][emp.id] = [
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' }
+          ];
         }
 
         const daysData = appData.records[weekInfo.weekKey][emp.id];
         let empTotalPay = 0;
         let empTotalHours = 0;
 
-        daysData.forEach((day, idx) => {
+        daysData.forEach(function(day, idx) {
           const calc = calculateDailyPay(emp, idx, day.in, day.out, day.isFestive);
           empTotalPay += calc.pay;
           empTotalHours += calc.hours;
@@ -290,126 +288,148 @@
 
         const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-        let badgePayType = `<span class="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Estándar</span>`;
-        if (emp.payType === 'fijo_semanal') badgePayType = `<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Fijo Semanal ($${emp.fixedSalary.toLocaleString()})</span>`;
-        if (emp.payType === 'hora_personalizada') badgePayType = `<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Hora Pers. ($${emp.customHour.toLocaleString()}/h)</span>`;
+        let badgePayType = '<span class="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Estándar</span>';
+        if (emp.payType === 'fijo_semanal') badgePayType = '<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Fijo Semanal ($' + emp.fixedSalary.toLocaleString() + ')</span>';
+        if (emp.payType === 'hora_personalizada') badgePayType = '<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Hora Pers. ($' + emp.customHour.toLocaleString() + '/h)</span>';
 
-        card.innerHTML = `
-          <div class="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition" onclick="toggleAccordion('${emp.id}')">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm">
-                ${emp.name.substring(0,2).toUpperCase()}
-              </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <h4 class="font-bold text-slate-900">${emp.name || 'Sin Nombre'}</h4>
-                  ${badgePayType}
-                </div>
-                <p class="text-xs text-slate-400 mt-0.5">${empTotalHours.toFixed(1)} hrs registradas esta semana</p>
-              </div>
-            </div>
+        let daysHtml = '';
+        daysData.forEach(function(day, dIdx) {
+          const dateObj = new Date(weekInfo.sunday);
+          dateObj.setDate(weekInfo.sunday.getDate() + dIdx);
+          const dayCalc = calculateDailyPay(emp, dIdx, day.in, day.out, day.isFestive);
+          const dayColor = (dIdx === 0) ? 'text-amber-600' : 'text-slate-700';
+          const checkedStr = day.isFestive ? 'checked' : '';
 
-            <div class="flex items-center gap-4">
-              <div class="text-right">
-                <span class="text-xs text-slate-400 block">Total Semana</span>
-                <span class="text-lg font-black text-emerald-600">$${Math.round(empTotalPay).toLocaleString()}</span>
-              </div>
-              <button onclick="event.stopPropagation(); openSalaryModal('${emp.id}')" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Editar Esquema Salarial">
-                <i class="fa-solid fa-gear"></i>
-              </button>
-              <i id="icon-${emp.id}" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>
-            </div>
-          </div>
+          daysHtml += '<div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">' +
+            '<div class="flex justify-between items-center">' +
+              '<span class="text-xs font-bold ' + dayColor + '">' + dayNames[dIdx] + '</span>' +
+              '<span class="text-[10px] text-slate-400">' + dateObj.getDate() + '/' + (dateObj.getMonth()+1) + '</span>' +
+            '</div>' +
+            '<div class="grid grid-cols-2 gap-1 text-xs">' +
+              '<div>' +
+                '<label class="text-[9px] text-slate-400 block">Entrada</label>' +
+                '<input type="time" value="' + (day.in || '') + '" onchange="updateDayField(\'' + emp.id + '\', ' + dIdx + ', \'in\', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[11px]">' +
+              '</div>' +
+              '<div>' +
+                '<label class="text-[9px] text-slate-400 block">Salida</label>' +
+                '<input type="time" value="' + (day.out || '') + '" onchange="updateDayField(\'' + emp.id + '\', ' + dIdx + ', \'out\', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[11px]">' +
+              '</div>' +
+            '</div>' +
+            '<div class="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">' +
+              '<label class="flex items-center gap-1 cursor-pointer text-slate-500">' +
+                '<input type="checkbox" ' + checkedStr + ' onchange="updateDayField(\'' + emp.id + '\', ' + dIdx + ', \'isFestive\', this.checked)" class="rounded text-indigo-600 focus:ring-0">' +
+                'Festivo' +
+              '</label>' +
+              '<span class="font-bold text-slate-700">' + dayCalc.hours.toFixed(1) + ' hrs</span>' +
+            '</div>' +
+            '<input type="text" placeholder="Observación..." value="' + (day.note || '') + '" onchange="updateDayField(\'' + emp.id + '\', ' + dIdx + ', \'note\', this.value)" class="w-full text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-1 focus:bg-white">' +
+            '<div class="text-right text-xs font-bold text-indigo-900 pt-1">$' + Math.round(dayCalc.pay).toLocaleString() + '</div>' +
+          '</div>';
+        });
 
-          <div id="details-${emp.id}" class="hidden border-t border-slate-100 bg-slate-50/50 p-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
-              ${daysData.map((day, dIdx) => {
-                const dateObj = new Date(weekInfo.sunday);
-                dateObj.setDate(weekInfo.sunday.getDate() + dIdx);
-                const dayCalc = calculateDailyPay(emp, dIdx, day.in, day.out, day.isFestive);
-
-                return `
-                  <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
-                    <div class="flex justify-between items-center">
-                      <span class="text-xs font-bold ${dIdx === 0 ? 'text-amber-600' : 'text-slate-700'}">${dayNames[dIdx]}</span>
-                      <span class="text-[10px] text-slate-400">${dateObj.getDate()}/${dateObj.getMonth()+1}</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-1 text-xs">
-                      <div>
-                        <label class="text-[9px] text-slate-400 block">Entrada</label>
-                        <input type="time" value="${day.in}" onchange="updateDayField('${emp.id}',${dIdx}, 'in', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[11px]">
-                      </div>
-                      <div>
-                        <label class="text-[9px] text-slate-400 block">Salida</label>
-                        <input type="time" value="${day.out}" onchange="updateDayField('${emp.id}',${dIdx}, 'out', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[11px]">
-                      </div>
-                    </div>
-
-                    <div class="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
-                      <label class="flex items-center gap-1 cursor-pointer text-slate-500">
-                        <input type="checkbox" ${day.isFestive ? 'checked' : ''} onchange="updateDayField('${emp.id}',${dIdx}, 'isFestive', this.checked)" class="rounded text-indigo-600 focus:ring-0">
-                        Festivo
-                      </label>
-                      <span class="font-bold text-slate-700">${dayCalc.hours.toFixed(1)} hrs</span>
-                    </div>
-
-                    <input type="text" placeholder="Observación..." value="${day.note \vert{}\vert{} ''}" onchange="updateDayField('${emp.id}', ${dIdx}, 'note', this.value)" class="w-full text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-1 focus:bg-white">                      <div class="text-right text-xs font-bold text-indigo-900 pt-1"> $${Math.round(dayCalc.pay).toLocaleString()}
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        `;
+        card.innerHTML = '<div class="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition" onclick="toggleAccordion(\'' + emp.id + '\')">' +
+            '<div class="flex items-center gap-3">' +
+              '<div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm">' +
+                emp.name.substring(0,2).toUpperCase() +
+              '</div>' +
+              '<div>' +
+                '<div class="flex items-center gap-2">' +
+                  '<h4 class="font-bold text-slate-900">' + (emp.name || 'Sin Nombre') + '</h4>' +
+                  badgePayType +
+                '</div>' +
+                '<p class="text-xs text-slate-400 mt-0.5">' + empTotalHours.toFixed(1) + ' hrs registradas esta semana</p>' +
+              '</div>' +
+            '</div>' +
+            '<div class="flex items-center gap-4">' +
+              '<div class="text-right">' +
+                '<span class="text-xs text-slate-400 block">Total Semana</span>' +
+                '<span class="text-lg font-black text-emerald-600">$' + Math.round(empTotalPay).toLocaleString() + '</span>' +
+              '</div>' +
+              '<button onclick="event.stopPropagation(); openSalaryModal(\'' + emp.id + '\')" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Editar Esquema Salarial">' +
+                '<i class="fa-solid fa-gear"></i>' +
+              '</button>' +
+              '<button onclick="event.stopPropagation(); deleteEmployee(\'' + emp.id + '\')" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Eliminar Empleado">' +
+                '<i class="fa-solid fa-trash-can"></i>' +
+              '</button>' +
+              '<i id="icon-' + emp.id + '" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>' +
+            '</div>' +
+          '</div>' +
+          '<div id="details-' + emp.id + '" class="hidden border-t border-slate-100 bg-slate-50/50 p-4">' +
+            '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">' +
+              daysHtml +
+            '</div>' +
+          '</div>';
 
         container.appendChild(card);
       });
 
-      document.getElementById('kpiTotalCost').textContent = `$${Math.round(totalWeeklyCost).toLocaleString()}`;
-      document.getElementById('kpiTotalHours').textContent = `${totalWeeklyHours.toFixed(1)} hrs`;
-      document.getElementById('kpiExtraHours').textContent = `${totalExtraHours.toFixed(1)} hrs Extras acumuladas`;
+      document.getElementById('kpiTotalCost').textContent = '$' + Math.round(totalWeeklyCost).toLocaleString();
+      document.getElementById('kpiTotalHours').textContent = totalWeeklyHours.toFixed(1) + ' hrs';
+      document.getElementById('kpiExtraHours').textContent = totalExtraHours.toFixed(1) + ' hrs Extras acumuladas';
       document.getElementById('kpiEmployees').textContent = appData.employees.length;
       document.getElementById('kpiNotesCount').textContent = totalNotesCount;
     }
 
     function toggleAccordion(empId) {
-      const details = document.getElementById(`details-${empId}`);
-      const icon = document.getElementById(`icon-${empId}`);
-      details.classList.toggle('hidden');
-      icon.classList.toggle('rotate-180');
+      const details = document.getElementById('details-' + empId);
+      const icon = document.getElementById('icon-' + empId);
+      if (details && icon) {
+        details.classList.toggle('hidden');
+        icon.classList.toggle('rotate-180');
+      }
+    }
+
+    function deleteEmployee(empId) {
+      if (confirm('¿Deseas eliminar este empleado?')) {
+        appData.employees = appData.employees.filter(function(e) { return e.id !== empId; });
+        saveData();
+      }
     }
 
     function updateDayField(empId, dayIdx, field, value) {
       const weekInfo = getWeekInfo(currentWeekOffset);
+      if (!appData.records[weekInfo.weekKey][empId]) return;
       appData.records[weekInfo.weekKey][empId][dayIdx][field] = value;
       saveData();
     }
 
-    document.getElementById('formAddEmployee').addEventListener('submit', (e) => {
+    document.getElementById('formAddEmployee').addEventListener('submit', function(e) {
       e.preventDefault();
       const input = document.getElementById('inputEmpName');
-      const name = input.value.trim() || `Empleado ${appData.employees.length + 1}`;
+      const name = input.value.trim();
+      if (!name) return;
       
-      appData.employees.push({
+      const newEmp = {
         id: Date.now().toString(),
-        name,
+        name: name,
         payType: 'estandar',
         fixedSalary: 0,
         customHour: 0,
         customExtra: 0
-      });
+      };
 
+      appData.employees.push(newEmp);
       input.value = '';
       saveData();
     });
 
-    document.getElementById('btnApplyBulkHours').addEventListener('click', () => {
+    document.getElementById('btnApplyBulkHours').addEventListener('click', function() {
       const weekInfo = getWeekInfo(currentWeekOffset);
       const bIn = document.getElementById('bulkIn').value;
       const bOut = document.getElementById('bulkOut').value;
 
-      appData.employees.forEach(emp => {
+      appData.employees.forEach(function(emp) {
+        if (!appData.records[weekInfo.weekKey][emp.id]) {
+          appData.records[weekInfo.weekKey][emp.id] = [
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' },
+            { in: '', out: '', isFestive: false, note: '' }
+          ];
+        }
         for (let i = 0; i < 7; i++) {
           appData.records[weekInfo.weekKey][emp.id][i].in = bIn;
           appData.records[weekInfo.weekKey][emp.id][i].out = bOut;
@@ -421,8 +441,9 @@
 
     function openSalaryModal(empId) {
       editingEmpId = empId;
-      const emp = appData.employees.find(e => e.id === empId);
-      document.getElementById('modalEmpTitle').textContent = `Esquema Salarial: ${emp.name}`;
+      const emp = appData.employees.find(function(e) { return e.id === empId; });
+      if (!emp) return;
+      document.getElementById('modalEmpTitle').textContent = 'Esquema Salarial: ' + emp.name;
       document.getElementById('modalPayType').value = emp.payType;
       document.getElementById('modalFixedSalary').value = emp.fixedSalary || 350000;
       document.getElementById('modalCustomHour').value = emp.customHour || 12000;
@@ -439,38 +460,39 @@
     }
 
     document.getElementById('modalPayType').addEventListener('change', updateModalGroups);
-    document.getElementById('btnCancelModal').addEventListener('click', () => {
+    document.getElementById('btnCancelModal').addEventListener('click', function() {
       document.getElementById('salaryModal').classList.add('hidden');
     });
 
-    document.getElementById('btnSaveModal').addEventListener('click', () => {
-      const emp = appData.employees.find(e => e.id === editingEmpId);
-      emp.payType = document.getElementById('modalPayType').value;
-      emp.fixedSalary = parseFloat(document.getElementById('modalFixedSalary').value) || 0;
-      emp.customHour = parseFloat(document.getElementById('modalCustomHour').value) || 0;
-      emp.customExtra = parseFloat(document.getElementById('modalCustomExtra').value) || 0;
-
+    document.getElementById('btnSaveModal').addEventListener('click', function() {
+      const emp = appData.employees.find(function(e) { return e.id === editingEmpId; });
+      if (emp) {
+        emp.payType = document.getElementById('modalPayType').value;
+        emp.fixedSalary = parseFloat(document.getElementById('modalFixedSalary').value) || 0;
+        emp.customHour = parseFloat(document.getElementById('modalCustomHour').value) || 0;
+        emp.customExtra = parseFloat(document.getElementById('modalCustomExtra').value) || 0;
+      }
       document.getElementById('salaryModal').classList.add('hidden');
       saveData();
     });
 
-    document.getElementById('btnPrevWeek').addEventListener('click', () => { currentWeekOffset--; renderApp(); });
-    document.getElementById('btnNextWeek').addEventListener('click', () => { currentWeekOffset++; renderApp(); });
+    document.getElementById('btnPrevWeek').addEventListener('click', function() { currentWeekOffset--; renderApp(); });
+    document.getElementById('btnNextWeek').addEventListener('click', function() { currentWeekOffset++; renderApp(); });
 
-    document.getElementById('btnExportCSV').addEventListener('click', () => {
+    document.getElementById('btnExportCSV').addEventListener('click', function() {
       const weekInfo = getWeekInfo(currentWeekOffset);
       let csv = 'Empleado,Dia,Fecha,Entrada,Salida,HorasTrabajadas,PagoDia,Festivo,Observacion\n';
 
       const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-      appData.employees.forEach(emp => {
+      appData.employees.forEach(function(emp) {
         const days = appData.records[weekInfo.weekKey][emp.id] || [];
-        days.forEach((day, idx) => {
+        days.forEach(function(day, idx) {
           const dateObj = new Date(weekInfo.sunday);
           dateObj.setDate(weekInfo.sunday.getDate() + idx);
           const calc = calculateDailyPay(emp, idx, day.in, day.out, day.isFestive);
 
-          csv += `"${emp.name}","${dayNames[idx]}","${dateObj.toLocaleDateString()}","${day.in}","${day.out}",${calc.hours.toFixed(2)},${calc.pay},"${day.isFestive ? 'SI' : 'NO'}","${day.note || ''}"\n`;
+          csv += '"' + emp.name + '","' + dayNames[idx] + '","' + dateObj.toLocaleDateString() + '","' + day.in + '","' + day.out + '",' + calc.hours.toFixed(2) + ',' + calc.pay + ',"' + (day.isFestive ? 'SI' : 'NO') + '","' + (day.note || '') + '"\n';
         });
       });
 
@@ -478,7 +500,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Nomina_${weekInfo.weekKey}.csv`;
+      a.download = 'Nomina_' + weekInfo.weekKey + '.csv';
       a.click();
     });
 
