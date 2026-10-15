@@ -3,13 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Registro y Nómina Semanal</title>
+  <title>Sistema de Registro y Nómina Semanal en Tiempo Real</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
   </style>
+  
+  <!-- Carga de Firebase en Tiempo Real -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyApb7MABhchPftJhhoSAQWP_nNbxeFhnBU",
+      authDomain: "nomina-app-419da.firebaseapp.com",
+      projectId: "nomina-app-419da",
+      storageBucket: "nomina-app-419da.firebasestorage.app",
+      messagingSenderId: "460876427993",
+      appId: "1:460876427993:web:6b3fed54bb9372a6f044c8"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.db = db;
+    window.doc = doc;
+    window.onSnapshot = onSnapshot;
+    window.setDoc = setDoc;
+  </script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen pb-12">
 
@@ -21,7 +44,10 @@
         </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight">Control de Nómina Semanal</h1>
-          <p class="text-xs text-indigo-200">Gestión de Horarios, Tarifas y Novedades</p>
+          <p class="text-xs text-indigo-200 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Sincronizado en Tiempo Real
+          </p>
         </div>
       </div>
 
@@ -53,7 +79,7 @@
         <div>
           <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Costo Nómina Semanal</p>
           <h3 id="kpiTotalCost" class="text-2xl font-black text-indigo-900 mt-1">$0</h3>
-          <p class="text-[11px] text-slate-400 mt-0.5">Calculado en tiempo real</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">Sincronizado en vivo</p>
         </div>
         <div class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 text-xl font-bold">
           <i class="fa-solid fa-money-bill-wave"></i>
@@ -75,7 +101,7 @@
         <div>
           <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Empleados Activos</p>
           <h3 id="kpiEmployees" class="text-2xl font-black text-slate-800 mt-1">0</h3>
-          <p class="text-[11px] text-slate-400 mt-0.5">Registrados en plantilla</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">En plantilla compartida</p>
         </div>
         <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 text-xl font-bold">
           <i class="fa-solid fa-users"></i>
@@ -117,53 +143,32 @@
 
   </main>
 
-  <div id="salaryModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
-      <h3 class="text-lg font-bold text-slate-900 mb-1" id="modalEmpTitle">Esquema Salarial Diferencial</h3>
-      <p class="text-xs text-slate-500 mb-4">Ajusta la modalidad de pago para este trabajador.</p>
-      
-      <div class="space-y-4 text-sm">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Modalidad de Pago</label>
-          <select id="modalPayType" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
-            <option value="estandar">Tarifa Estándar General ($70k / $100k)</option>
-            <option value="fijo_semanal">Salario Fijo Semanal</option>
-            <option value="hora_personalizada">Valor Personalizado por Hora</option>
-          </select>
-        </div>
-
-        <div id="groupFijoSemanal" class="hidden">
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Salario Fijo Semanal ($)</label>
-          <input type="number" id="modalFixedSalary" value="350000" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
-        </div>
-
-        <div id="groupHoraPersonalizada" class="hidden space-y-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Hora Estándar ($)</label>
-            <input type="number" id="modalCustomHour" value="12000" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Hora Extra ($)</label>
-            <input type="number" id="modalCustomExtra" value="15000" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
-          </div>
-        </div>
-      </div>
-
-      <div class="flex justify-end gap-2 mt-6">
-        <button id="btnCancelModal" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
-        <button id="btnSaveModal" class="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow">Guardar Cambios</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     let currentWeekOffset = 0;
     let editingEmpId = null;
 
-    let appData = JSON.parse(localStorage.getItem('nomina_app_data')) || {
+    let appData = {
       employees: [],
       records: {}
     };
+
+    setTimeout(() => {
+      if (window.db) {
+        window.onSnapshot(window.doc(window.db, "nomina", "general"), (docSnap) => {
+          if (docSnap.exists()) {
+            appData = docSnap.data();
+            renderApp();
+          }
+        });
+      }
+    }, 1000);
+
+    function saveData() {
+      renderApp();
+      if (window.db) {
+        window.setDoc(window.doc(window.db, "nomina", "general"), appData);
+      }
+    }
 
     function getWeekInfo(offset) {
       const now = new Date();
@@ -189,11 +194,6 @@
       date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
       const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
       return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
-    }
-
-    function saveData() {
-      localStorage.setItem('nomina_app_data', JSON.stringify(appData));
-      renderApp();
     }
 
     function calculateDailyPay(emp, dayIndex, inTime, outTime, isFestive) {
@@ -345,9 +345,6 @@
                 '<span class="text-xs text-slate-400 block">Total Semana</span>' +
                 '<span class="text-lg font-black text-emerald-600">$' + Math.round(empTotalPay).toLocaleString() + '</span>' +
               '</div>' +
-              '<button onclick="event.stopPropagation(); openSalaryModal(\'' + emp.id + '\')" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Editar Esquema Salarial">' +
-                '<i class="fa-solid fa-gear"></i>' +
-              '</button>' +
               '<button onclick="event.stopPropagation(); deleteEmployee(\'' + emp.id + '\')" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Eliminar Empleado">' +
                 '<i class="fa-solid fa-trash-can"></i>' +
               '</button>' +
@@ -436,43 +433,6 @@
         }
       });
 
-      saveData();
-    });
-
-    function openSalaryModal(empId) {
-      editingEmpId = empId;
-      const emp = appData.employees.find(function(e) { return e.id === empId; });
-      if (!emp) return;
-      document.getElementById('modalEmpTitle').textContent = 'Esquema Salarial: ' + emp.name;
-      document.getElementById('modalPayType').value = emp.payType;
-      document.getElementById('modalFixedSalary').value = emp.fixedSalary || 350000;
-      document.getElementById('modalCustomHour').value = emp.customHour || 12000;
-      document.getElementById('modalCustomExtra').value = emp.customExtra || 15000;
-
-      updateModalGroups();
-      document.getElementById('salaryModal').classList.remove('hidden');
-    }
-
-    function updateModalGroups() {
-      const type = document.getElementById('modalPayType').value;
-      document.getElementById('groupFijoSemanal').classList.toggle('hidden', type !== 'fijo_semanal');
-      document.getElementById('groupHoraPersonalizada').classList.toggle('hidden', type !== 'hora_personalizada');
-    }
-
-    document.getElementById('modalPayType').addEventListener('change', updateModalGroups);
-    document.getElementById('btnCancelModal').addEventListener('click', function() {
-      document.getElementById('salaryModal').classList.add('hidden');
-    });
-
-    document.getElementById('btnSaveModal').addEventListener('click', function() {
-      const emp = appData.employees.find(function(e) { return e.id === editingEmpId; });
-      if (emp) {
-        emp.payType = document.getElementById('modalPayType').value;
-        emp.fixedSalary = parseFloat(document.getElementById('modalFixedSalary').value) || 0;
-        emp.customHour = parseFloat(document.getElementById('modalCustomHour').value) || 0;
-        emp.customExtra = parseFloat(document.getElementById('modalCustomExtra').value) || 0;
-      }
-      document.getElementById('salaryModal').classList.add('hidden');
       saveData();
     });
 
