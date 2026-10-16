@@ -175,7 +175,7 @@
 
   <script>
     let currentWeekOffset = 0;
-    let editingEmpId = null;
+    let openAccordions = {}; // Controla el estado abierto/cerrado de cada tarjeta de empleado
 
     let appData = {
       employees: [],
@@ -201,9 +201,10 @@
     }
 
     function parseTimeStr(time24) {
-      if (!time24) return { h: '08', m: '00', ampm: 'AM' };
+      if (!time24) return { h: '', m: '00', ampm: 'AM' };
       const parts = time24.split(':');
       let hours = parseInt(parts[0], 10);
+      if (isNaN(hours)) return { h: '', m: '00', ampm: 'AM' };
       const minutes = parts[1] || '00';
       const ampm = hours >= 12 ? 'PM' : 'AM';
       hours = hours % 12;
@@ -215,6 +216,7 @@
     function formatTo24(h, m, ampm) {
       if (!h || h === '') return '';
       let hours = parseInt(h, 10);
+      if (isNaN(hours)) return '';
       if (ampm === 'PM' && hours < 12) hours += 12;
       if (ampm === 'AM' && hours === 12) hours = 0;
       const hStr = hours < 10 ? '0' + hours : '' + hours;
@@ -259,13 +261,13 @@
       const hours = Math.max(0, totalMins / 60);
 
       if (emp.payType === 'fijo_semanal') {
-        return { hours: hours, regularHours: Math.min(7, hours), extraHours: Math.max(0, hours - 7), pay: emp.fixedSalary / 6 };
+        return { hours: hours, regularHours: Math.min(7, hours), extraHours: Math.max(0, hours - 7), pay: 0 };
       }
 
       if (emp.payType === 'hora_personalizada') {
         const regH = Math.min(7, hours);
         const extH = Math.max(0, hours - 7);
-        const pay = (regH * emp.customHour) + (extH * emp.customExtra) + (isFestive ? 20000 : 0);
+        const pay = (regH * (emp.customHour || 0)) + (extH * (emp.customExtra || 0)) + (isFestive ? 20000 : 0);
         return { hours: hours, regularHours: regH, extraHours: extH, pay: pay };
       }
 
@@ -304,18 +306,26 @@
 
       appData.employees.forEach(function(emp) {
         if (!appData.records[weekInfo.weekKey][emp.id]) {
-          appData.records[weekInfo.weekKey][emp.id] = [
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' }
-          ];
+          appData.records[weekInfo.weekKey][emp.id] = {
+            days: [
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' }
+            ],
+            extraPay: 0,
+            sundayPay: 0,
+            festivePay: 0,
+            sundayCompPay: 0
+          };
         }
 
-        const daysData = appData.records[weekInfo.weekKey][emp.id];
+        const empWeekRecord = appData.records[weekInfo.weekKey][emp.id];
+        const daysData = Array.isArray(empWeekRecord) ? empWeekRecord : empWeekRecord.days;
+        
         let empTotalPay = 0;
         let empTotalHours = 0;
 
@@ -329,9 +339,16 @@
         });
 
         if (emp.payType === 'fijo_semanal') {
-          empTotalPay = emp.fixedSalary;
+          empTotalPay = (parseFloat(emp.fixedSalary) || 0);
         }
 
+        // Sumar novedades personalizadas ingresadas
+        const extraPay = parseFloat(empWeekRecord.extraPay) || 0;
+        const sundayPay = parseFloat(empWeekRecord.sundayPay) || 0;
+        const festivePay = parseFloat(empWeekRecord.festivePay) || 0;
+        const sundayCompPay = parseFloat(empWeekRecord.sundayCompPay) || 0;
+
+        empTotalPay += (extraPay + sundayPay + festivePay + sundayCompPay);
         totalWeeklyCost += empTotalPay;
 
         const card = document.createElement('div');
@@ -340,8 +357,7 @@
         const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
         let badgePayType = '<span class="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Estándar</span>';
-        if (emp.payType === 'fijo_semanal') badgePayType = '<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Fijo Semanal ($' + emp.fixedSalary.toLocaleString() + ')</span>';
-        if (emp.payType === 'hora_personalizada') badgePayType = '<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Hora Pers. ($' + emp.customHour.toLocaleString() + '/h)</span>';
+        if (emp.payType === 'fijo_semanal') badgePayType = '<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Fijo Semanal ($' + (emp.fixedSalary || 0).toLocaleString() + ')</span>';
 
         let daysHtml = '';
         daysData.forEach(function(day, dIdx) {
@@ -359,7 +375,7 @@
               '<span class="text-xs font-bold ' + dayColor + '">' + dayNames[dIdx] + '</span>' +
               '<div class="flex items-center gap-1.5">' +
                 '<span class="text-[10px] text-slate-400">' + dateObj.getDate() + '/' + (dateObj.getMonth()+1) + '</span>' +
-                '<button onclick="clearDayField(\'' + emp.id + '\', ' + dIdx + ')" class="text-slate-300 hover:text-red-500 transition" title="Limpiar este día">' +
+                '<button onclick="clearDayField(\'' + emp.id + '\', ' + dIdx + ')" class="text-slate-300 hover:text-red-500 transition" title="Limpiar horas de este día">' +
                   '<i class="fa-solid fa-rotate-left text-[11px]"></i>' +
                 '</button>' +
               '</div>' +
@@ -413,6 +429,14 @@
           '</div>';
         });
 
+        // Configuración de Sueldo Base Fijo
+        const isFijo = (emp.payType === 'fijo_semanal');
+        const salaryVal = emp.fixedSalary || '';
+
+        // Comprobar si la tarjeta debe estar abierta
+        const isOpen = openAccordions[emp.id] ? '' : 'hidden';
+        const iconRotate = openAccordions[emp.id] ? 'rotate-180' : '';
+
         card.innerHTML = '<div class="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition" onclick="toggleAccordion(\'' + emp.id + '\')">' +
             '<div class="flex items-center gap-3">' +
               '<div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm">' +
@@ -422,6 +446,9 @@
                 '<div class="flex items-center gap-2">' +
                   '<h4 class="font-bold text-slate-900">' + (emp.name || 'Sin Nombre') + '</h4>' +
                   badgePayType +
+                  '<button onclick="event.stopPropagation(); deleteEmployee(\'' + emp.id + '\')" class="p-1 text-slate-300 hover:text-red-600 rounded transition ml-1" title="Eliminar Empleado">' +
+                    '<i class="fa-solid fa-trash-can text-xs"></i>' +
+                  '</button>' +
                 '</div>' +
                 '<p class="text-xs text-slate-400 mt-0.5">' + empTotalHours.toFixed(1) + ' hrs registradas esta semana</p>' +
               '</div>' +
@@ -431,13 +458,45 @@
                 '<span class="text-xs text-slate-400 block">Total Semana</span>' +
                 '<span class="text-lg font-black text-emerald-600">$' + Math.round(empTotalPay).toLocaleString() + '</span>' +
               '</div>' +
-              '<button onclick="event.stopPropagation(); deleteEmployee(\'' + emp.id + '\')" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Eliminar Empleado">' +
-                '<i class="fa-solid fa-trash-can"></i>' +
-              '</button>' +
-              '<i id="icon-' + emp.id + '" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>' +
+              '<i id="icon-' + emp.id + '" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 ' + iconRotate + '"></i>' +
             '</div>' +
           '</div>' +
-          '<div id="details-' + emp.id + '" class="hidden border-t border-slate-100 bg-slate-50/50 p-4">' +
+          '<div id="details-' + emp.id + '" class="' + isOpen + ' border-t border-slate-100 bg-slate-50/50 p-4 space-y-4">' +
+            '<!-- Panel Configuración de Salario Semanal Novedades -->' +
+            '<div class="bg-white p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">' +
+              '<div class="flex items-center gap-3">' +
+                '<label class="flex items-center gap-1.5 font-semibold text-slate-700 cursor-pointer">' +
+                  '<input type="checkbox" ' + (isFijo ? 'checked' : '') + ' onchange="toggleFijoSalario(\'' + emp.id + '\', this.checked)" class="rounded text-indigo-600 focus:ring-0">' +
+                  'Sueldo Básico Semanal:' +
+                '</label>' +
+                '<div class="flex items-center gap-1">' +
+                  '<span class="text-slate-400 font-bold">$</span>' +
+                  '<input type="number" placeholder="Ej: 400000" value="' + salaryVal + '" onchange="updateFixedSalary(\'' + emp.id + '\', this.value)" class="w-28 px-2 py-1 bg-slate-50 border border-slate-200 rounded font-bold text-slate-800">' +
+                '</div>' +
+              '</div>' +
+
+              '<!-- Inputs de Novedades Manuales -->' +
+              '<div class="flex flex-wrap items-center gap-2 bg-indigo-50/60 p-2 rounded-lg border border-indigo-100">' +
+                '<span class="font-bold text-indigo-900 text-[11px]"><i class="fa-solid fa-calculator"></i> Novedades ($):</span>' +
+                '<div class="flex items-center gap-1">' +
+                  '<span class="text-[10px] text-slate-500">Extras:</span>' +
+                  '<input type="number" placeholder="0" value="' + (empWeekRecord.extraPay || '') + '" onchange="updateNovedad(\'' + emp.id + '\', \'extraPay\', this.value)" class="w-16 px-1.5 py-0.5 text-[11px] border rounded bg-white font-semibold">' +
+                '</div>' +
+                '<div class="flex items-center gap-1">' +
+                  '<span class="text-[10px] text-slate-500">Domingo:</span>' +
+                  '<input type="number" placeholder="0" value="' + (empWeekRecord.sundayPay || '') + '" onchange="updateNovedad(\'' + emp.id + '\', \'sundayPay\', this.value)" class="w-16 px-1.5 py-0.5 text-[11px] border rounded bg-white font-semibold">' +
+                '</div>' +
+                '<div class="flex items-center gap-1">' +
+                  '<span class="text-[10px] text-slate-500">Festivo:</span>' +
+                  '<input type="number" placeholder="0" value="' + (empWeekRecord.festivePay || '') + '" onchange="updateNovedad(\'' + emp.id + '\', \'festivePay\', this.value)" class="w-16 px-1.5 py-0.5 text-[11px] border rounded bg-white font-semibold">' +
+                '</div>' +
+                '<div class="flex items-center gap-1">' +
+                  '<span class="text-[10px] text-slate-500">Dom. Compensatorio:</span>' +
+                  '<input type="number" placeholder="0" value="' + (empWeekRecord.sundayCompPay || '') + '" onchange="updateNovedad(\'' + emp.id + '\', \'sundayCompPay\', this.value)" class="w-16 px-1.5 py-0.5 text-[11px] border rounded bg-white font-semibold">' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+
             '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">' +
               daysHtml +
             '</div>' +
@@ -454,6 +513,7 @@
     }
 
     function toggleAccordion(empId) {
+      openAccordions[empId] = !openAccordions[empId];
       const details = document.getElementById('details-' + empId);
       const icon = document.getElementById('icon-' + empId);
       if (details && icon) {
@@ -462,8 +522,34 @@
       }
     }
 
+    function toggleFijoSalario(empId, isChecked) {
+      const emp = appData.employees.find(e => e.id === empId);
+      if (emp) {
+        emp.payType = isChecked ? 'fijo_semanal' : 'estandar';
+        saveData();
+      }
+    }
+
+    function updateFixedSalary(empId, val) {
+      const emp = appData.employees.find(e => e.id === empId);
+      if (emp) {
+        emp.fixedSalary = parseFloat(val) || 0;
+        emp.payType = 'fijo_semanal';
+        saveData();
+      }
+    }
+
+    function updateNovedad(empId, field, val) {
+      const weekInfo = getWeekInfo(currentWeekOffset);
+      if (!appData.records[weekInfo.weekKey][empId]) return;
+      
+      const num = parseFloat(val) || 0;
+      appData.records[weekInfo.weekKey][empId][field] = num;
+      saveData();
+    }
+
     function deleteEmployee(empId) {
-      if (confirm('¿Deseas eliminar este empleado?')) {
+      if (confirm('¿Deseas eliminar este empleado de la plantilla?')) {
         appData.employees = appData.employees.filter(function(e) { return e.id !== empId; });
         saveData();
       }
@@ -481,14 +567,20 @@
     function updateDayField(empId, dayIdx, field, value) {
       const weekInfo = getWeekInfo(currentWeekOffset);
       if (!appData.records[weekInfo.weekKey][empId]) return;
-      appData.records[weekInfo.weekKey][empId][dayIdx][field] = value;
+      
+      const rec = appData.records[weekInfo.weekKey][empId];
+      const days = Array.isArray(rec) ? rec : rec.days;
+      days[dayIdx][field] = value;
       saveData();
     }
 
     function clearDayField(empId, dayIdx) {
       const weekInfo = getWeekInfo(currentWeekOffset);
       if (!appData.records[weekInfo.weekKey][empId]) return;
-      appData.records[weekInfo.weekKey][empId][dayIdx] = { in: '', out: '', isFestive: false, note: '' };
+      
+      const rec = appData.records[weekInfo.weekKey][empId];
+      const days = Array.isArray(rec) ? rec : rec.days;
+      days[dayIdx] = { in: '', out: '', isFestive: false, note: '' };
       saveData();
     }
 
@@ -529,18 +621,26 @@
 
       appData.employees.forEach(function(emp) {
         if (!appData.records[weekInfo.weekKey][emp.id]) {
-          appData.records[weekInfo.weekKey][emp.id] = [
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' },
-            { in: '', out: '', isFestive: false, note: '' }
-          ];
+          appData.records[weekInfo.weekKey][emp.id] = {
+            days: [
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' },
+              { in: '', out: '', isFestive: false, note: '' }
+            ],
+            extraPay: 0,
+            sundayPay: 0,
+            festivePay: 0,
+            sundayCompPay: 0
+          };
         }
-        appData.records[weekInfo.weekKey][emp.id][targetDay].in = bIn;
-        appData.records[weekInfo.weekKey][emp.id][targetDay].out = bOut;
+        const rec = appData.records[weekInfo.weekKey][emp.id];
+        const days = Array.isArray(rec) ? rec : rec.days;
+        days[targetDay].in = bIn;
+        days[targetDay].out = bOut;
       });
 
       saveData();
@@ -556,7 +656,8 @@
       const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
       appData.employees.forEach(function(emp) {
-        const days = appData.records[weekInfo.weekKey][emp.id] || [];
+        const rec = appData.records[weekInfo.weekKey][emp.id] || {};
+        const days = Array.isArray(rec) ? rec : (rec.days || []);
         days.forEach(function(day, idx) {
           const dateObj = new Date(weekInfo.sunday);
           dateObj.setDate(weekInfo.sunday.getDate() + idx);
