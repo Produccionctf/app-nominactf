@@ -175,7 +175,7 @@
 
   <script>
     let currentWeekOffset = 0;
-    let openAccordions = {}; // Controla el estado abierto/cerrado de cada tarjeta de empleado
+    let openAccordions = {}; 
 
     let appData = {
       employees: [],
@@ -316,10 +316,16 @@
               { in: '', out: '', isFestive: false, note: '' },
               { in: '', out: '', isFestive: false, note: '' }
             ],
-            extraPay: 0,
-            sundayPay: 0,
-            festivePay: 0,
-            sundayCompPay: 0
+            // Valores por tarifa unitaria
+            rateExtra: 10000,
+            rateSunday: 100000,
+            rateFestive: 20000,
+            rateSundayComp: 80000,
+            // Cantidades digitadas
+            qtyExtra: 0,
+            qtySunday: 0,
+            qtyFestive: 0,
+            qtySundayComp: 0
           };
         }
 
@@ -342,13 +348,26 @@
           empTotalPay = (parseFloat(emp.fixedSalary) || 0);
         }
 
-        // Sumar novedades personalizadas ingresadas
-        const extraPay = parseFloat(empWeekRecord.extraPay) || 0;
-        const sundayPay = parseFloat(empWeekRecord.sundayPay) || 0;
-        const festivePay = parseFloat(empWeekRecord.festivePay) || 0;
-        const sundayCompPay = parseFloat(empWeekRecord.sundayCompPay) || 0;
+        // Cálculos automáticos: Valor x Cantidad
+        const rExtra = parseFloat(empWeekRecord.rateExtra) || 0;
+        const qExtra = parseFloat(empWeekRecord.qtyExtra) || 0;
+        const totalExtraCalc = rExtra * qExtra;
 
-        empTotalPay += (extraPay + sundayPay + festivePay + sundayCompPay);
+        const rSunday = parseFloat(empWeekRecord.rateSunday) || 0;
+        const qSunday = parseFloat(empWeekRecord.qtySunday) || 0;
+        const totalSundayCalc = rSunday * qSunday;
+
+        const rFestive = parseFloat(empWeekRecord.rateFestive) || 0;
+        const qFestive = parseFloat(empWeekRecord.qtyFestive) || 0;
+        const totalFestiveCalc = rFestive * qFestive;
+
+        const rSundayComp = parseFloat(empWeekRecord.rateSundayComp) || 0;
+        const qSundayComp = parseFloat(empWeekRecord.qtySundayComp) || 0;
+        const totalSundayCompCalc = rSundayComp * qSundayComp;
+
+        const totalNovedadesCalc = totalExtraCalc + totalSundayCalc + totalFestiveCalc + totalSundayCompCalc;
+
+        empTotalPay += totalNovedadesCalc;
         totalWeeklyCost += empTotalPay;
 
         const card = document.createElement('div');
@@ -357,7 +376,7 @@
         const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
         let badgePayType = '<span class="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Estándar</span>';
-        if (emp.payType === 'fijo_semanal') badgePayType = '<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Fijo Semanal ($' + (emp.fixedSalary || 0).toLocaleString() + ')</span>';
+        if (emp.payType === 'fijo_semanal') badgePayType = '<span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Sueldo Básico ($' + (emp.fixedSalary || 0).toLocaleString() + ')</span>';
 
         let daysHtml = '';
         daysData.forEach(function(day, dIdx) {
@@ -429,11 +448,9 @@
           '</div>';
         });
 
-        // Configuración de Sueldo Base Fijo
         const isFijo = (emp.payType === 'fijo_semanal');
         const salaryVal = emp.fixedSalary || '';
 
-        // Comprobar si la tarjeta debe estar abierta
         const isOpen = openAccordions[emp.id] ? '' : 'hidden';
         const iconRotate = openAccordions[emp.id] ? 'rotate-180' : '';
 
@@ -461,39 +478,97 @@
               '<i id="icon-' + emp.id + '" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 ' + iconRotate + '"></i>' +
             '</div>' +
           '</div>' +
+
           '<div id="details-' + emp.id + '" class="' + isOpen + ' border-t border-slate-100 bg-slate-50/50 p-4 space-y-4">' +
-            '<!-- Panel Configuración de Salario Semanal Novedades -->' +
-            '<div class="bg-white p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">' +
-              '<div class="flex items-center gap-3">' +
-                '<label class="flex items-center gap-1.5 font-semibold text-slate-700 cursor-pointer">' +
-                  '<input type="checkbox" ' + (isFijo ? 'checked' : '') + ' onchange="toggleFijoSalario(\'' + emp.id + '\', this.checked)" class="rounded text-indigo-600 focus:ring-0">' +
-                  'Sueldo Básico Semanal:' +
+            
+            '<!-- PANEL DE CALCULADORA DE NOVEDADES Y SUELDO BÁSICO -->' +
+            '<div class="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-3 text-xs shadow-sm">' +
+              '<div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-2.5">' +
+                '<label class="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">' +
+                  '<input type="checkbox" ' + (isFijo ? 'checked' : '') + ' onchange="toggleFijoSalario(\'' + emp.id + '\', this.checked)" class="rounded text-indigo-600 focus:ring-0 w-4 h-4">' +
+                  '<span class="text-sm">Activar Sueldo Básico Semanal</span>' +
                 '</label>' +
-                '<div class="flex items-center gap-1">' +
+                '<div class="flex items-center gap-1.5 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">' +
                   '<span class="text-slate-400 font-bold">$</span>' +
-                  '<input type="number" placeholder="Ej: 400000" value="' + salaryVal + '" onchange="updateFixedSalary(\'' + emp.id + '\', this.value)" class="w-28 px-2 py-1 bg-slate-50 border border-slate-200 rounded font-bold text-slate-800">' +
+                  '<input type="number" placeholder="Ej: 400000" value="' + salaryVal + '" onchange="updateFixedSalary(\'' + emp.id + '\', this.value)" class="w-32 px-2 py-0.5 bg-white border border-slate-300 rounded-lg font-black text-indigo-900 text-sm focus:outline-none">' +
                 '</div>' +
               '</div>' +
 
-              '<!-- Inputs de Novedades Manuales -->' +
-              '<div class="flex flex-wrap items-center gap-2 bg-indigo-50/60 p-2 rounded-lg border border-indigo-100">' +
-                '<span class="font-bold text-indigo-900 text-[11px]"><i class="fa-solid fa-calculator"></i> Novedades ($):</span>' +
-                '<div class="flex items-center gap-1">' +
-                  '<span class="text-[10px] text-slate-500">Extras:</span>' +
-                  '<input type="number" placeholder="0" value="' + (empWeekRecord.extraPay || '') + '" onchange="updateNovedad(\'' + emp.id + '\', \'extraPay\', this.value)" class="w-16 px-1.5 py-0.5 text-[11px] border rounded bg-white font-semibold">' +
+              '<!-- TABLA DE CÁLCULO MULTIPLICADOR (VALOR x CANTIDAD) -->' +
+              '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">' +
+                
+                '<!-- Horas Extras -->' +
+                '<div class="bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100 space-y-1.5">' +
+                  '<div class="flex justify-between items-center font-bold text-indigo-900 text-[11px]">' +
+                    '<span>Horas Extras</span>' +
+                    '<span class="text-emerald-600 font-black">+$' + Math.round(totalExtraCalc).toLocaleString() + '</span>' +
+                  '</div>' +
+                  '<div class="grid grid-cols-2 gap-1 text-[10px]">' +
+                    '<div>' +
+                      '<span class="text-slate-400 block">Val. Hora:</span>' +
+                      '<input type="number" value="' + (empWeekRecord.rateExtra || 10000) + '" onchange="updateNovedadRate(\'' + emp.id + '\', \'rateExtra\', this.value)" class="w-full px-1.5 py-0.5 border rounded bg-white font-semibold text-slate-700">' +
+                    '</div>' +
+                    '<div>' +
+                      '<span class="text-indigo-600 font-bold block">Cant. Hrs:</span>' +
+                      '<input type="number" placeholder="0" value="' + (empWeekRecord.qtyExtra || '') + '" onchange="updateNovedadQty(\'' + emp.id + '\', \'qtyExtra\', this.value)" class="w-full px-1.5 py-0.5 border-2 border-indigo-400 rounded bg-white font-bold text-indigo-900">' +
+                    '</div>' +
+                  '</div>' +
                 '</div>' +
-                '<div class="flex items-center gap-1">' +
-                  '<span class="text-[10px] text-slate-500">Domingo:</span>' +
-                  '<input type="number" placeholder="0" value="' + (empWeekRecord.sundayPay || '') + '" onchange="updateNovedad(\'' + emp.id + '\', \'sundayPay\', this.value)" class="w-16 px-1.5 py-0.5 text-[11px] border rounded bg-white font-semibold">' +
+
+                '<!-- Domingo -->' +
+                '<div class="bg-amber-50/50 p-2.5 rounded-xl border border-amber-100 space-y-1.5">' +
+                  '<div class="flex justify-between items-center font-bold text-amber-900 text-[11px]">' +
+                    '<span>Domingo Trabalhado</span>' +
+                    '<span class="text-emerald-600 font-black">+$' + Math.round(totalSundayCalc).toLocaleString() + '</span>' +
+                  '</div>' +
+                  '<div class="grid grid-cols-2 gap-1 text-[10px]">' +
+                    '<div>' +
+                      '<span class="text-slate-400 block">Val. Día:</span>' +
+                      '<input type="number" value="' + (empWeekRecord.rateSunday || 100000) + '" onchange="updateNovedadRate(\'' + emp.id + '\', \'rateSunday\', this.value)" class="w-full px-1.5 py-0.5 border rounded bg-white font-semibold text-slate-700">' +
+                    '</div>' +
+                    '<div>' +
+                      '<span class="text-amber-700 font-bold block">Cant. Días:</span>' +
+                      '<input type="number" placeholder="0" value="' + (empWeekRecord.qtySunday || '') + '" onchange="updateNovedadQty(\'' + emp.id + '\', \'qtySunday\', this.value)" class="w-full px-1.5 py-0.5 border-2 border-amber-400 rounded bg-white font-bold text-amber-900">' +
+                    '</div>' +
+                  '</div>' +
                 '</div>' +
-                '<div class="flex items-center gap-1">' +
-                  '<span class="text-[10px] text-slate-500">Festivo:</span>' +
-                  '<input type="number" placeholder="0" value="' + (empWeekRecord.festivePay || '') + '" onchange="updateNovedad(\'' + emp.id + '\', \'festivePay\', this.value)" class="w-16 px-1.5 py-0.5 text-[11px] border rounded bg-white font-semibold">' +
+
+                '<!-- Festivo -->' +
+                '<div class="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100 space-y-1.5">' +
+                  '<div class="flex justify-between items-center font-bold text-emerald-900 text-[11px]">' +
+                    '<span>Festivo</span>' +
+                    '<span class="text-emerald-600 font-black">+$' + Math.round(totalFestiveCalc).toLocaleString() + '</span>' +
+                  '</div>' +
+                  '<div class="grid grid-cols-2 gap-1 text-[10px]">' +
+                    '<div>' +
+                      '<span class="text-slate-400 block">Val. Día:</span>' +
+                      '<input type="number" value="' + (empWeekRecord.rateFestive || 20000) + '" onchange="updateNovedadRate(\'' + emp.id + '\', \'rateFestive\', this.value)" class="w-full px-1.5 py-0.5 border rounded bg-white font-semibold text-slate-700">' +
+                    '</div>' +
+                    '<div>' +
+                      '<span class="text-emerald-700 font-bold block">Cant. Días:</span>' +
+                      '<input type="number" placeholder="0" value="' + (empWeekRecord.qtyFestive || '') + '" onchange="updateNovedadQty(\'' + emp.id + '\', \'qtyFestive\', this.value)" class="w-full px-1.5 py-0.5 border-2 border-emerald-400 rounded bg-white font-bold text-emerald-900">' +
+                    '</div>' +
+                  '</div>' +
                 '</div>' +
-                '<div class="flex items-center gap-1">' +
-                  '<span class="text-[10px] text-slate-500">Dom. Compensatorio:</span>' +
-                  '<input type="number" placeholder="0" value="' + (empWeekRecord.sundayCompPay || '') + '" onchange="updateNovedad(\'' + emp.id + '\', \'sundayCompPay\', this.value)" class="w-16 px-1.5 py-0.5 text-[11px] border rounded bg-white font-semibold">' +
+
+                '<!-- Domingo Compensatorio -->' +
+                '<div class="bg-purple-50/50 p-2.5 rounded-xl border border-purple-100 space-y-1.5">' +
+                  '<div class="flex justify-between items-center font-bold text-purple-900 text-[11px]">' +
+                    '<span>Dom. Compensatorio</span>' +
+                    '<span class="text-emerald-600 font-black">+$' + Math.round(totalSundayCompCalc).toLocaleString() + '</span>' +
+                  '</div>' +
+                  '<div class="grid grid-cols-2 gap-1 text-[10px]">' +
+                    '<div>' +
+                      '<span class="text-slate-400 block">Val. Día:</span>' +
+                      '<input type="number" value="' + (empWeekRecord.rateSundayComp || 80000) + '" onchange="updateNovedadRate(\'' + emp.id + '\', \'rateSundayComp\', this.value)" class="w-full px-1.5 py-0.5 border rounded bg-white font-semibold text-slate-700">' +
+                    '</div>' +
+                    '<div>' +
+                      '<span class="text-purple-700 font-bold block">Cant. Días:</span>' +
+                      '<input type="number" placeholder="0" value="' + (empWeekRecord.qtySundayComp || '') + '" onchange="updateNovedadQty(\'' + emp.id + '\', \'qtySundayComp\', this.value)" class="w-full px-1.5 py-0.5 border-2 border-purple-400 rounded bg-white font-bold text-purple-900">' +
+                    '</div>' +
+                  '</div>' +
                 '</div>' +
+
               '</div>' +
             '</div>' +
 
@@ -539,7 +614,16 @@
       }
     }
 
-    function updateNovedad(empId, field, val) {
+    function updateNovedadRate(empId, field, val) {
+      const weekInfo = getWeekInfo(currentWeekOffset);
+      if (!appData.records[weekInfo.weekKey][empId]) return;
+      
+      const num = parseFloat(val) || 0;
+      appData.records[weekInfo.weekKey][empId][field] = num;
+      saveData();
+    }
+
+    function updateNovedadQty(empId, field, val) {
       const weekInfo = getWeekInfo(currentWeekOffset);
       if (!appData.records[weekInfo.weekKey][empId]) return;
       
@@ -631,10 +715,14 @@
               { in: '', out: '', isFestive: false, note: '' },
               { in: '', out: '', isFestive: false, note: '' }
             ],
-            extraPay: 0,
-            sundayPay: 0,
-            festivePay: 0,
-            sundayCompPay: 0
+            rateExtra: 10000,
+            rateSunday: 100000,
+            rateFestive: 20000,
+            rateSundayComp: 80000,
+            qtyExtra: 0,
+            qtySunday: 0,
+            qtyFestive: 0,
+            qtySundayComp: 0
           };
         }
         const rec = appData.records[weekInfo.weekKey][emp.id];
